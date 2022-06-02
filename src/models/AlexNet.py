@@ -22,7 +22,7 @@ Todo:
 import typing
 
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import layers, losses, metrics, optimizers
 from tensorflow.keras.layers import Layer
 from tensorflow.keras.models import Model
 from tensorflow.python.framework.ops import EagerTensor
@@ -110,8 +110,11 @@ class AlexNet(Model):
     ReLU applied to output of every conv and fully connected layer.\n
     layer 별로 미리 정리해두는게 나을듯
 
+    Args:
+        classes: number of classes to predict
+
     """
-    def __init__(self):
+    def __init__(self, classes: int):
         super(AlexNet, self).__init__()
         self.conv1 = SeparateConv2D(filters=96, kernel_size=(11, 11), strides=4, n=2)
         self.act1 = layers.ReLU()
@@ -141,7 +144,7 @@ class AlexNet(Model):
 
         self.fc6 = layers.Dense(4096)
         self.fc7 = layers.Dense(4096)
-        self.fc8 = layers.Dense(1000, activation="softmax")
+        self.fc8 = layers.Dense(classes, activation="softmax")
 
     def call(self, inputs, training=None, mask=None) -> EagerTensor:
         # First layer
@@ -190,9 +193,18 @@ class AlexNet(Model):
         pass
 
 
+def AlexNet100():
+    model = AlexNet(100)
+    loss = losses.SparseCategoricalCrossentropy()
+    optimizer = optimizers.Adam(learning_rate=1e-3)
+    metric = metrics.Accuracy()
+    model.compile(loss=loss, optimizer=optimizer, metrics=[metric])
+    return model
+
+
 if __name__ == "__main__":
-    data = tf.random.normal((1, 224, 224, 3))
-    model = AlexNet()
+    data = tf.random.normal((1, 32, 32, 3))
+    model = AlexNet(100)
     out = model(data)
     print(model.summary())
     print(tf.shape(out))
