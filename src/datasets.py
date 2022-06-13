@@ -1,9 +1,15 @@
 """데이터 로딩 함수 구현
+
+ToDo:
+    * dogs-vs-cats 로딩함수 구현 필요 (https://www.kaggle.com/competitions/dogs-vs-cats/data)
+    * Cifar100 return => class로 대체
 """
 import pickle
 import util
 import numpy as np
 import typing
+import os
+import cv2
 
 
 def cifar10() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[str]]:
@@ -30,8 +36,8 @@ def cifar10() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[str]]:
     return data_list, label_list, label_names
 
 
-def cifar100() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[int],
-                               np.ndarray, typing.List[int], typing.List[int],
+def cifar100() -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray,
+                               np.ndarray, np.ndarray, np.ndarray,
                                typing.List[str], typing.List[str]]:
     """
 
@@ -74,23 +80,58 @@ def cifar100() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[int],
     with open(train_filepath, "rb") as f:
         cifar100_dict = pickle.load(f, encoding="bytes")
         train_data = cifar100_dict[b"data"]
-        train_fine_labels = cifar100_dict[b"fine_labels"]
-        train_coarse_labels = cifar100_dict[b"coarse_labels"]
+        train_fine_labels = np.array(cifar100_dict[b"fine_labels"])
+        train_coarse_labels = np.array(cifar100_dict[b"coarse_labels"])
 
     with open(test_filepath, "rb") as f:
         cifar100_dict = pickle.load(f, encoding="bytes")
         test_data = cifar100_dict[b"data"]
-        test_fine_labels = cifar100_dict[b"fine_labels"]
-        test_coarse_labels = cifar100_dict[b"coarse_labels"]
+        test_fine_labels = np.array(cifar100_dict[b"fine_labels"])
+        test_coarse_labels = np.array(cifar100_dict[b"coarse_labels"])
 
     return (train_data, train_fine_labels, train_coarse_labels,
             test_data, test_fine_labels, test_coarse_labels,
             fine_label_names, coarse_label_names)
 
 
+def dogs_cats():
+    """
+    dogs-vs-cats 데이터 로드
+
+    Returns:
+        train_data, train_label, test_data, test_label
+
+    """
+    train_path = "../data/dogs-vs-cats/train/"
+    test_path = "../data/dogs-vs-cats/test1/"
+    train_file_list = os.listdir(train_path)
+    test_file_list = os.listdir(test_path)
+    train_img_list = []
+    train_label_list = []
+    test_img_list = []
+    test_label_list = []
+    for fn in train_file_list:
+        img = cv2.imread(train_path + fn, cv2.IMREAD_UNCHANGED)
+        img = cv2.resize(img, (112, 112))
+        train_img_list.append(img)
+        if fn.split(".")[0] == "cat":
+            train_label_list.append(0)
+        else:
+            train_label_list.append(1)
+
+    for fn in test_file_list:
+        img = cv2.imread(test_path + fn)
+        test_img_list.append(img)
+
+    train_img_list = np.array(train_img_list)
+    train_label_list = np.array(train_label_list)
+    test_img_list = np.array(test_img_list)
+    test_label_list = np.array(test_label_list)
+
+    return train_img_list, train_label_list, test_img_list, test_label_list
+
+
 if __name__ == "__main__":
-    train_data, train_fine, train_coarse, _, _, _, _, _ = cifar100()
-    print(train_data.shape)
-    print(len(train_fine))
-    print(len(train_fine))
+    train_img, *rest = dogs_cats()
+    print(train_img.shape)
 
