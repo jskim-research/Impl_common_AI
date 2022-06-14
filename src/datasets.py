@@ -10,6 +10,7 @@ import numpy as np
 import typing
 import os
 import cv2
+import tensorflow as tf
 
 
 def cifar10() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[str]]:
@@ -94,41 +95,43 @@ def cifar100() -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray,
             fine_label_names, coarse_label_names)
 
 
-def dogs_cats():
+def dogs_cats(training: bool) -> typing.Tuple[tf.data.Dataset, int]:
     """
     dogs-vs-cats 데이터 로드
 
+    Args:
+        training: if True, load training data. Else, load test data.
     Returns:
-        train_data, train_label, test_data, test_label
-
+        tensorflow dataset, number of data
     """
-    train_path = "../data/dogs-vs-cats/train/"
-    test_path = "../data/dogs-vs-cats/test1/"
-    train_file_list = os.listdir(train_path)
-    test_file_list = os.listdir(test_path)
-    train_img_list = []
-    train_label_list = []
-    test_img_list = []
-    test_label_list = []
-    for fn in train_file_list:
-        img = cv2.imread(train_path + fn, cv2.IMREAD_UNCHANGED)
-        img = cv2.resize(img, (112, 112))
-        train_img_list.append(img)
-        if fn.split(".")[0] == "cat":
-            train_label_list.append(0)
-        else:
-            train_label_list.append(1)
+    if training:
+        path = "../data/dogs-vs-cats/train/"
+    else:
+        path = "../data/dogs-vs-cats/test1/"
 
-    for fn in test_file_list:
-        img = cv2.imread(test_path + fn)
-        test_img_list.append(img)
+    file_list = os.listdir(path)
 
-    train_img_list = np.array(train_img_list)
-    train_label_list = np.array(train_label_list)
-    test_img_list = np.array(test_img_list)
-    test_label_list = np.array(test_label_list)
+    def dogs_cats_generator():
+        """
+        Returns:
+            generator
 
-    return train_img_list, train_label_list, test_img_list, test_label_list
+        """
+        for fn in file_list:
+            img = cv2.imread(path + fn, cv2.IMREAD_UNCHANGED)
+            img = cv2.resize(img, (112, 112))
+            img = tf.convert_to_tensor(img, dtype=tf.float32) / 255  # typecast and normalization
+            label = 0
+            if fn.split(".")[0] == "cat":
+                label = 0
+            else:
+                label = 1
+            yield img, label
+
+    dataset = tf.data.Dataset.from_generator(dogs_cats_generator, (tf.float32, tf.int16),
+                                             output_shapes=([112, 112, 3], []))
+
+    return dataset, len(file_list)
 
 
 if __name__ == "__main__":
