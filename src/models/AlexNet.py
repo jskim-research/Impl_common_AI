@@ -35,7 +35,7 @@ class LocalResponseNormalization(Layer):
     k, n, alpha, beta is pre-set according to the paper\n
     현대의 CNN은 batch normalization 기법을 많이 씀
     """
-    def __init__(self, k: int = 2, n: int = 5, alpha: float = 1e-4, beta: float = 0.75):
+    def __init__(self, k: float = 2.0, n: int = 5, alpha: float = 1e-4, beta: float = 0.75):
         super(LocalResponseNormalization, self).__init__()
         self.k = k
         self.n = n
@@ -46,18 +46,25 @@ class LocalResponseNormalization(Layer):
         """Normalize the inputs
 
         Args:
-            inputs: (batch size x width x height x channel)
+            inputs: (batch size x width x height x channel) or (separate num x batch size x width x height x channel)
         Returns:
             normalized inputs
         """
-        N = tf.shape(inputs)[3]  # number of channels
-        out = tf.identity(inputs).numpy()  # copy and type-cast (maybe performance degradation)
+        N = tf.shape(inputs)[-1]  # number of channels
+        divisor_list = []
+
+        half_n = int(self.n / 2)  # half of window size
+
         for i in range(N):
             divisor = self.k + self.alpha * \
-                      tf.reduce_sum(inputs[:, :, :, tf.maximum(0, i-int(self.n/2)):tf.maximum(N-1, int(i+self.n/2))] ** 2)
-            out[:, :, :, i] = inputs[:, :, :, i] / (divisor ** self.beta)
+                      tf.reduce_sum(inputs[:, :, :, tf.maximum(0, i-half_n):tf.maximum(N-1, i+half_n)] ** 2)
+            divisor_list.append(divisor ** self.beta)
+            # out[:, :, :, i] = inputs[:, :, :, i] / (divisor ** self.beta)
+            # out[:, :, :, i] /= (divisor ** self.beta)
 
-        out = tf.convert_to_tensor(out)
+        # divisor_list = tf.convert_to_tensor(divisor_list)
+        # out = tf.divide(inputs, divisor_list)
+        out = inputs
         return out
 
 
@@ -98,7 +105,7 @@ class SeparateConv2D(Layer):
         for i in range(self.n):
             start = interval * i
             end = interval * (i+1)
-            sub_inputs.append(self.conv_list[i](inputs[:, :, :, start:end]))
+            sub_inputs.append(self.conv_list[i](inputs[:, :, :, start:end]))  # channel 분리하여 계산
 
         return sub_inputs
 
@@ -202,8 +209,17 @@ def AlexNet100():
     return model
 
 
+def AlexNet2():
+    model = AlexNet(2)
+    loss = losses.SparseCategoricalCrossentropy()
+    optimizer = optimizers.Adam(learning_rate=1e-2)
+    metric = metrics.SparseCategoricalAccuracy()
+    model.compile(loss=loss, optimizer=optimizer, metrics=[metric])
+    return model
+
+
 if __name__ == "__main__":
-    data = tf.random.normal((1, 32, 32, 3))
+    data = tf.random.normal((2, 32*4, 32*4, 3))
     model = AlexNet(100)
     out = model(data)
     print(model.summary())

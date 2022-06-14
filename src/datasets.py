@@ -117,7 +117,7 @@ def dogs_cats(training: bool) -> typing.Tuple[tf.data.Dataset, int]:
             generator
 
         """
-        for fn in file_list:
+        for idx, fn in enumerate(file_list):
             img = cv2.imread(path + fn, cv2.IMREAD_UNCHANGED)
             img = cv2.resize(img, (112, 112))
             img = tf.convert_to_tensor(img, dtype=tf.float32) / 255  # typecast and normalization
