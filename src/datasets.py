@@ -11,6 +11,7 @@ import typing
 import os
 import cv2
 import tensorflow as tf
+import tf_record
 import matplotlib.pyplot as plt
 
 
@@ -96,122 +97,31 @@ def cifar100() -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray,
             fine_label_names, coarse_label_names)
 
 
-def image_feature(value):
-    return tf.train.Feature(
-        bytes_list=tf.train.BytesList(value=[tf.io.encode_jpeg(value).numpy()])  
-        # encode를 해서 저장하므로 메모리를 좀 줄일 수 있을 듯
-    )
-
-
-def bytes_feature(value):
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value.encode("utf-8")]))
-
-
-def int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
-
-
-def create_example(image, path, file_name):
-    feature = {
-        # "image": image_feature(image),
-        "path": bytes_feature(path),
-        "filename": bytes_feature(file_name),
-    }
-    return tf.train.Example(features=tf.train.Features(feature=feature))
-
-
-def parse_tfrecord_fn(example):
-    feature_description = {
-        # "image": tf.io.FixedLenFeature([], tf.string),
-        "path": tf.io.FixedLenFeature([], tf.string),
-        "filename": tf.io.FixedLenFeature([], tf.string),
-    }
-    example = tf.io.parse_single_example(example, feature_description)
-    # example["image"] = tf.io.decode_jpeg(example["image"], channels=3)
-    return example
-
-
-def Make_TFRecord(file_path: str, save_path: str, num_samples: int) -> None:
-    """Make TFRecord of dogs-cats dataset
-
-    Args:
-        file_path: where to load
-        save_path: where to save
-        num_samples: number of samples in each TFRecord file
-    Returns:
-        return nothing
-    """
-    file_list = os.listdir(file_path)
-    num_tfrecords = len(file_list) // num_samples
-    if len(file_list) % num_samples:
-        num_tfrecords += 1  # add one recorde if there are any remaining samples
-
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-
-    for tfrec_num in range(num_tfrecords):
-        samples = file_list[(tfrec_num * num_samples):((tfrec_num+1) * num_samples)]
-        with tf.io.TFRecordWriter(save_path + "file_%.2i-%i.tfrec" % (tfrec_num, len(file_list))) as writer:
-            for sample in samples:  # sample = file_name
-                image = tf.io.decode_jpeg(tf.io.read_file(file_path + sample))
-                example = create_example(image, file_path, sample)
-                writer.write(example.SerializeToString())
-
-    raw_dataset = tf.data.TFRecordDataset(f"{file_path}/file_00-{num_samples}")
-    parsed_dataset = raw_dataset.map(parse_tfrecord_fn)
-
-    for features in parsed_dataset.take(1):
-        print(features)
-        for key in features.keys():
-            if key != "image":
-                print(f"{key}: {features[key]}")
-
-        # print(f"Image shape: {features['image'].shape}")
-        # plt.figure(figsize=(7, 7))
-        # plt.imshow(features["image"].numpy())
-        # plt.show()
-
-
-def dogs_cats(training: bool) -> typing.Tuple[tf.data.Dataset, int]:
+def dogs_cats(init: bool, training: bool) -> typing.Tuple[tf.data.Dataset, int]:
     """
     dogs-vs-cats 데이터 로드
 
     Args:
+        init: whether to make tfrecord or not
         training: if True, load training data. Else, load test data.
     Returns:
         tensorflow dataset, number of data
     """
     if training:
-        path = "../data/dogs-vs-cats/train/"
+        file_path = "../data/dogs-vs-cats/train/"
+        save_path = "../data/dogs-vs-cats/tf_records/train/"
     else:
-        path = "../data/dogs-vs-cats/test1/"
+        file_path = "../data/dogs-vs-cats/test1/"
+        save_path = "../data/dogs-vs-cats/tf_records/test1/"
 
-    file_list = os.listdir(path)
-
-    def dogs_cats_generator():
-        """
-        Returns:
-            generator
-
-        """
-        for idx, fn in enumerate(file_list):
-            img = cv2.imread(path + fn, cv2.IMREAD_UNCHANGED)
-            img = cv2.resize(img, (112, 112))
-            img = tf.convert_to_tensor(img, dtype=tf.float32) / 255  # typecast and normalization
-            label = 0
-            if fn.split(".")[0] == "cat":
-                label = 0
-            else:
-                label = 1
-            yield img, label
-
-    dataset = tf.data.Dataset.from_generator(dogs_cats_generator, (tf.float32, tf.int16),
-                                             output_shapes=([112, 112, 3], []))
-
-    return dataset, len(file_list)
+    num_samples = 4096
+    record = tf_record.DogsCatsRecord(file_path, save_path, num_samples)
+    if init:
+        record.make_records()
+    dataset = record.load_records()
+    return dataset, record.get_data_num()
 
 
 if __name__ == "__main__":
-    train_img, *rest = dogs_cats()
-    print(train_img.shape)
+    pass
 
