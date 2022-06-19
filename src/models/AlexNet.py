@@ -99,13 +99,10 @@ class SeparateConv2D(Layer):
         Returns:
             sub inputs
         """
-        interval = int(tf.shape(inputs)[3] / self.n)
         sub_inputs = []
 
         for i in range(self.n):
-            start = interval * i
-            end = interval * (i+1)
-            sub_inputs.append(self.conv_list[i](inputs[:, :, :, start:end]))  # channel 분리하여 계산
+            sub_inputs.append(self.conv_list[i](inputs))
 
         return sub_inputs
 

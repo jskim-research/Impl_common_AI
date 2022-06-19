@@ -56,8 +56,7 @@ class DogsCatsRecord:
     def __init__(self, file_path: str, save_path: str, num_samples: int):
         self.feature_description = {
             "image": tf.io.FixedLenFeature([], tf.string),
-            "path": tf.io.FixedLenFeature([], tf.string),
-            "filename": tf.io.FixedLenFeature([], tf.string),
+            "label": tf.io.FixedLenFeature([], tf.int64),
         }
         self.num_samples = num_samples  # number of samples for each tfrecord
         self.total_num = len(os.listdir(file_path))  # total number of files
@@ -68,22 +67,20 @@ class DogsCatsRecord:
         """tfrecord 대상 데이터 개수 반환"""
         return self.total_num
 
-    def create_example(self, image, path, file_name):
+    def create_example(self, image, label):
         """
         데이터를 bytes로 변환
 
         Args:
             image:
-            path:
-            file_name:
+            label:
 
         Returns:
 
         """
         feature = {
             "image": image_feature(image),
-            "path": bytes_feature(path),
-            "filename": bytes_feature(file_name),
+            "label": int64_feature(label),
         }
         return tf.train.Example(features=tf.train.Features(feature=feature))
 
@@ -108,8 +105,20 @@ class DogsCatsRecord:
                     image = tf.io.decode_jpeg(tf.io.read_file(self.file_path + sample))
                     image = tf.image.resize(image, [112, 112])  # method default = bilinear
                     image = tf.cast(image, dtype=tf.uint8)  # resize 후에 float가 되는데 JPEG encode 시에는 uint8로 써야함
-                    example = self.create_example(image, self.file_path, sample)
+                    if sample.split(".")[0] == "cat":
+                        label = 0
+                    else:
+                        label = 1
+
+                    example = self.create_example(image, label)
                     writer.write(example.SerializeToString())
+
+    def normalize(self, example):
+        """tfrecord 데이터셋 전처리 및 (x, y) 형태 생성"""
+        example['image'] = example['image'] / 255  # 0~1 정규화
+        input = example['image']
+        label = example.pop('label')
+        return input, label
 
     def load_records(self) -> tf.data.Dataset:
         """
@@ -120,6 +129,7 @@ class DogsCatsRecord:
         tfrecord_path = [self.save_path + fn for fn in file_list]
         raw_dataset = tf.data.TFRecordDataset(tfrecord_path)
         parsed_dataset = raw_dataset.map(self.parse_example)
+        parsed_dataset = parsed_dataset.map(self.normalize)
         return parsed_dataset
 
 
@@ -131,13 +141,8 @@ if __name__ == "__main__":
     record = DogsCatsRecord(file_path_test, save_path_test, num_samples_test)
     record.make_records()
     dataset = record.load_records()
-    dataset = dataset.batch(32)
-    for features in dataset:
-        print(features['filename'])
-        # print(f"Image shape: {features['image'].shape}")
-        # plt.figure(figsize=(7, 7))
-        # plt.imshow(features["image"].numpy())
-        # plt.show()
-
+    dataset = dataset.shuffle(25000).batch(32)
+    for x, y in dataset:
+        print(x.shape)
 
 
