@@ -102,7 +102,7 @@ def dogs_cats(init: bool, training: bool) -> typing.Tuple[tf.data.Dataset, int]:
     dogs-vs-cats 데이터 로드
 
     Args:
-        init: whether to make tfrecord or not
+        init: if True, make tfrecords first
         training: if True, load training data. Else, load test data.
     Returns:
         tensorflow dataset, number of data
