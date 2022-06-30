@@ -2,12 +2,14 @@
 
 논문 제목: Going deeper with convolutions
 
-요약:
-Inception module
-=> 1x1, 3x3, 5x5 로 이루어진 모듈이며 dimension reduction을 위해 1x1 conv를 추가함
-=> 장점: 다음 layer에서 다양한 scale의 visual information을 볼 수 있음. 그러면서도 complexity를 너무 증가시키지 않음.
+구성요소:
 
-input: 224x224
+Inception module
+    - 1x1, 3x3, 5x5 로 이루어진 모듈이며 dimension reduction을 위해 1x1 conv를 추가함
+    - 장점: 다음 layer에서 다양한 scale의 visual information을 볼 수 있음. 그러면서도 complexity를 너무 증가시키지 않음.
+
+input image size: 224x224
+
 activation: 모든 layer에서 relu를 사용한 것으로 확인됨
 
 """
