@@ -2,7 +2,7 @@
 
 ToDo:
     * dogs-vs-cats 로딩함수 구현 필요 (https://www.kaggle.com/competitions/dogs-vs-cats/data)
-    * Cifar100 return => class로 대체
+    * Cifar100 return => class로 대체 (반환 변수가 너무 많음)
 """
 import pickle
 import util
@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 
 def cifar10() -> typing.Tuple[np.ndarray, typing.List[int], typing.List[str]]:
     """
-
-    need to see statistic of the data
+    image # = 50,000\n
+    shape = (channel=3, width=32, height=32)\n
 
     Returns:
         data (50,000 x 3,072), labels (50,000), label_names (50,000)
@@ -44,7 +44,10 @@ def cifar100() -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray,
                                typing.List[str], typing.List[str]]:
     """
 
-    500 training images and 100 testing images per class (total 50,000 + 10,000) x 3072 pixels (3 chan, 32x32)
+    training image #: 500 per class\n
+    test image #: 100 per class\n
+    class # = 100\n
+    shape = (channel=3, width=32, height=32)\n
 
     Returns:
         train_data, train_fine_labels, train_coarse_labels,
