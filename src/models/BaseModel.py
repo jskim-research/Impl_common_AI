@@ -79,22 +79,23 @@ class BaseModel(keras.Model):
         return config
 
 
-class RegressionGradCamModel(BaseModel):
+class GradCamModel(BaseModel):
     """
     CNN 모델이 입력 이미지에서 어느 부분을 중점적으로 봤는 지 계산 기능 추가\n
-    대상 모델은 call 함수 후 [회귀 예측 결과, 마지막 convolution 결과]를 출력해야 한다\n
+    대상 모델은 call 함수 후 [예측 결과, 마지막 convolution 결과]를 출력해야 한다\n
     Reference:
     - https://velog.io/@tobigs_xai/CAM-Grad-CAM-Grad-CAMpp
     """
     def __init__(self, model: keras.Model):
         super().__init__(model)
 
-    def get_grad_cam(self, inputs):
+    def get_grad_cam(self, inputs, class_label: int = 0):
         """
         model output에 대한 input의 gradient 반환
 
         Args:
             inputs: image which has shape (batch #, H, W, C)
+            class_label: which class to get gradient
         Returns:
             gradient which has shape (batch #, H, W, 1)
         """
@@ -105,8 +106,12 @@ class RegressionGradCamModel(BaseModel):
             # out has shape (batch #, 1)
             # final_conv_out has shape (batch #, H', W', C'), where H', W', C' represents H, W, C after convolutions
             out, final_conv_out = self.model(inputs)
+            out = out[:, class_label, None]  # (batch #, class #)
 
-        grad = tape.gradient(out, final_conv_out)  # d_out / d_final_conv_out which has shape (batch #, H', W', C')
+        # only select target class output
+        # assume that output has shape (batch #, class #)
+        grad = tape.gradient(out, final_conv_out)  # gradient has shape (batch #, H', W', C')
+
         # get summation of grad of each feature map which has shape (batch #, C')
         feature_map_grad_sum = tf.math.reduce_sum(tf.math.reduce_sum(grad, axis=1), axis=1)
         # get mean by calculating sum / (H' * W') which has shape (batch #, C')
@@ -116,12 +121,13 @@ class RegressionGradCamModel(BaseModel):
         image_shape = (input_shape[1], input_shape[2])  # (H, W)
         grad_cam_shape = (input_shape[0], input_shape[1], input_shape[2])  # (batch #, H, W)
         grad_cam = tf.zeros(grad_cam_shape)  # (batch #, H, W)
-        for c in range(final_conv_out.shape[2]):
-            weighted_feature_map = feature_map_grad_mean[:, c] * final_conv_out[:, :, :, c]  # shape (batch #, H', W')
+        for c in range(final_conv_out.shape[3]):
+            weighted_feature_map = feature_map_grad_mean[:, c, None, None] * final_conv_out[:, :, :, c]  # shape (batch #, H', W')
             expand_feature_map = tf.expand_dims(weighted_feature_map, axis=-1)  # shape (batch #, H', W', 1)
             resize_feature_map = [tf.image.resize(x, image_shape, method=tf.image.ResizeMethod.BILINEAR)
                                   for x in expand_feature_map]
-            grad_cam += tf.squeeze(tf.concat(resize_feature_map, axis=0))
+            concat_feature_map = tf.concat([tf.expand_dims(x, axis=0) for x in resize_feature_map], axis=0)
+            grad_cam += tf.squeeze(concat_feature_map)
 
         grad_cam = tf.expand_dims(grad_cam, axis=-1)  # shape (batch #, H, W, 1)
         return grad_cam
