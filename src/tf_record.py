@@ -103,7 +103,7 @@ class DogsCatsRecord:
             with tf.io.TFRecordWriter(self.save_path + "file_%.2i-%i.tfrec" % (tfrec_num, len(file_list))) as writer:
                 for sample in samples:  # sample = file_name
                     image = tf.io.decode_jpeg(tf.io.read_file(self.file_path + sample))
-                    image = tf.image.resize(image, [112, 112])  # method default = bilinear
+                    image = tf.image.resize(image, [224, 224])  # method default = bilinear
                     image = tf.cast(image, dtype=tf.uint8)  # resize 후에 float가 되는데 JPEG encode 시에는 uint8로 써야함
                     if sample.split(".")[0] == "cat":
                         label = 0
