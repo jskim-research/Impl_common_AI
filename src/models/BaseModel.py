@@ -68,7 +68,10 @@ class BaseModel(keras.Model):
     def call(self, inputs, training=None, mask=None):
         """첫 번째 출력만 반환"""
         outputs = self.model(inputs)
-        return outputs[0]
+        if isinstance(outputs, tuple) or isinstance(outputs, list):
+            return outputs[0]
+        else:
+            return outputs
 
     def get_config(self):
         config = super().get_config()
