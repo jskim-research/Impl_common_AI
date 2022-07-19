@@ -9,6 +9,7 @@ import keras
 import tensorflow as tf
 import typing
 from tensorflow.keras import layers
+from src.models import BaseModel
 
 
 def identity_block2d(input_tensor: tf.Tensor, filters: int) -> tf.Tensor:
@@ -94,37 +95,31 @@ def resnet(block: typing.Callable, filters: typing.List[int], layer_nums: typing
     for layer_idx, (_filter, _layer_num) in enumerate(zip(filters, layer_nums)):
         for block_idx in range(_layer_num):
             out = block(out, _filter)
+            final_conv_out = out
         if layer_idx == len(layer_nums)-1:
             out = layers.AvgPool2D(pool_size=(7, 7))(out)
         else:
             out = layers.MaxPool2D(pool_size=(3, 3), strides=2, padding="same")(out)
 
     out = layers.Dense(1000, activation="softmax")(out)
-    return keras.Model(inputs=[input_tensor], outputs=[out])
+    return keras.Model(inputs=[input_tensor], outputs=[out, final_conv_out])
 
 
 def resnet18():
-    return resnet(identity_block2d, filters=[64, 128, 256, 512], layer_nums=[2, 2, 2, 2])
+    return BaseModel.BaseModel(resnet(identity_block2d, filters=[64, 128, 256, 512], layer_nums=[2, 2, 2, 2]))
 
 
 def resnet34():
-    return resnet(identity_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 6, 3])
+    return BaseModel.BaseModel(resnet(identity_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 6, 3]))
 
 
 def resnet50():
-    return resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 6, 3])
+    return BaseModel.BaseModel(resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 6, 3]))
 
 
 def resnet101():
-    return resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 23, 3])
+    return BaseModel.BaseModel(resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 4, 23, 3]))
 
 
 def resnet152():
-    return resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 8, 36, 3])
-
-
-if __name__ == "__main__":
-    input_T = tf.random.normal((1, 224, 224, 3))
-    model = resnet152()
-    print(model.summary())
-    print(model(input_T).shape)
+    return BaseModel.BaseModel(resnet(bottleneck_block2d, filters=[64, 128, 256, 512], layer_nums=[3, 8, 36, 3]))
