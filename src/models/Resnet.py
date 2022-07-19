@@ -124,30 +124,33 @@ class ResNet(keras.Model):
             self.sequence.add(identity_mapping(channel=conv5_chan, shortcut_projection=(idx == 0)))
 
         self.AvgPool = layers.AvgPool2D(pool_size=(7, 7))
+        self.flat = layers.Flatten()
         self.fc = layers.Dense(1000, activation="softmax")
 
     def call(self, inputs, training=None, mask=None):
         final_conv_out = self.sequence(inputs)
-        out = self.fc(self.AvgPool(final_conv_out))
+        out = self.AvgPool(final_conv_out)  # (batch #, 1, 1, channel #)
+        out = self.flat(out)  # (batch #, channel #)
+        out = self.fc(out)
         return out, final_conv_out
 
 
 def resnet_18():
-    return BaseModel.BaseModel(ResNet(IdentityBlock, 64, 2, 128, 2, 256, 2, 512, 2))
+    return BaseModel.GradCamModel(ResNet(IdentityBlock, 64, 2, 128, 2, 256, 2, 512, 2))
 
 
 def resnet_34():
-    return BaseModel.BaseModel(ResNet(IdentityBlock, 64, 3, 128, 4, 256, 6, 512, 3))
+    return BaseModel.GradCamModel(ResNet(IdentityBlock, 64, 3, 128, 4, 256, 6, 512, 3))
 
 
 def resnet_50():
-    return BaseModel.BaseModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 6, 512, 3))
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 6, 512, 3))
 
 
 def resnet_101():
-    return BaseModel.BaseModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 23, 512, 3))
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 23, 512, 3))
 
 
 def resnet_152():
-    return BaseModel.BaseModel(ResNet(BottleneckBlock, 64, 3, 128, 8, 256, 36, 512, 3))
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 8, 256, 36, 512, 3))
 
