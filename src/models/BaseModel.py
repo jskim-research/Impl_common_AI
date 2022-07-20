@@ -106,10 +106,11 @@ class GradCamModel(BaseModel):
             # out has shape (batch #, 1)
             # final_conv_out has shape (batch #, H', W', C'), where H', W', C' represents H, W, C after convolutions
             out, final_conv_out = self.model(inputs)
-            out = out[:, class_label, None]  # (batch #, class #)
 
-        # only select target class output
-        # assume that output has shape (batch #, class #)
+            # only select target class output
+            # assume that out has shape (batch #, class #)
+            out = out[:, class_label, None]  # (batch #, 1)
+
         grad = tape.gradient(out, final_conv_out)  # gradient has shape (batch #, H', W', C')
 
         # get summation of grad of each feature map which has shape (batch #, C')
