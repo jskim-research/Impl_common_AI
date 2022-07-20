@@ -14,6 +14,7 @@ import keras
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Layer
 from tensorflow.keras.models import Model
+from src.models import BaseModel
 
 
 class IdentityBlock(Layer):
@@ -72,7 +73,7 @@ class BottleneckBlock(Layer):
         return self.norm(out + inputs)
 
 
-class ResNet(Model):
+class ResNet(keras.Model):
     """
     논문에 명시된 대로 shortcut projection이 필요한 경우는 각 conv layer를 넘어갈 때만이라고 가정함.
     """
@@ -95,7 +96,7 @@ class ResNet(Model):
             conv5_mapping: number of mapping blocks at layer 5
         """
         super().__init__()
-        self.sequence = keras.Sequential()
+        self.sequence = keras.Sequential()  # convolution sequence
         first_filters = 64
         self.sequence.add(layers.Conv2D(filters=first_filters, kernel_size=(7, 7), strides=2, padding="same", activation="relu"))
 
@@ -122,35 +123,34 @@ class ResNet(Model):
             # 첫 번째 block만 shortcut_projection 활성화
             self.sequence.add(identity_mapping(channel=conv5_chan, shortcut_projection=(idx == 0)))
 
-        self.sequence.add(layers.AvgPool2D(pool_size=(7, 7)))
-        self.sequence.add(layers.Dense(1000, activation="softmax"))
+        self.AvgPool = layers.AvgPool2D(pool_size=(7, 7))
+        self.flat = layers.Flatten()
+        self.fc = layers.Dense(1000, activation="softmax")
 
     def call(self, inputs, training=None, mask=None):
-        return self.sequence(inputs)
+        final_conv_out = self.sequence(inputs)
+        out = self.AvgPool(final_conv_out)  # (batch #, 1, 1, channel #)
+        out = self.flat(out)  # (batch #, channel #)
+        out = self.fc(out)
+        return out, final_conv_out
 
 
 def resnet_18():
-    return ResNet(IdentityBlock, 64, 2, 128, 2, 256, 2, 512, 2)
+    return BaseModel.GradCamModel(ResNet(IdentityBlock, 64, 2, 128, 2, 256, 2, 512, 2))
 
 
 def resnet_34():
-    return ResNet(IdentityBlock, 64, 3, 128, 4, 256, 6, 512, 3)
+    return BaseModel.GradCamModel(ResNet(IdentityBlock, 64, 3, 128, 4, 256, 6, 512, 3))
 
 
 def resnet_50():
-    return ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 6, 512, 3)
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 6, 512, 3))
 
 
 def resnet_101():
-    return ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 23, 512, 3)
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 4, 256, 23, 512, 3))
 
 
 def resnet_152():
-    return ResNet(BottleneckBlock, 64, 3, 128, 8, 256, 36, 512, 3)
-
-
-if __name__ == "__main__":
-    rand_input = tf.random.normal((1, 224, 224, 3))
-    model = resnet_152()
-    print(model(rand_input).shape)
+    return BaseModel.GradCamModel(ResNet(BottleneckBlock, 64, 3, 128, 8, 256, 36, 512, 3))
 
