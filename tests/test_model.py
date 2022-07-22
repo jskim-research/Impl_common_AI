@@ -1,5 +1,5 @@
 import tensorflow as tf
-from src.models import Resnet, Resnet_update
+from src.models import Resnet, Resnet_update, BaseModel
 
 
 def test_resnet():
@@ -30,4 +30,13 @@ def test_resnet():
     assert func_resnet50(tmp_input).shape == tf.TensorShape([batch_num, 1, 1, 1000])
     assert func_resnet101(tmp_input).shape == tf.TensorShape([batch_num, 1, 1, 1000])
     assert func_resnet152(tmp_input).shape == tf.TensorShape([batch_num, 1, 1, 1000])
+
+
+def test_grad_cam():
+    """grad_cam 구현 검증"""
+    resnet18 = Resnet.resnet_18()
+    batch_num = 8
+    tmp_input = tf.random.normal((batch_num, 224, 224, 3))  # (batch #, H, W, C)
+    assert resnet18.get_grad_cam(tmp_input, 1).shape == tf.TensorShape([batch_num, 224, 224, 1])
+
 
