@@ -124,7 +124,3 @@ def dogs_cats(init: bool, training: bool) -> typing.Tuple[tf.data.Dataset, int]:
     dataset = record.load_records()
     return dataset, record.get_data_num()
 
-
-if __name__ == "__main__":
-    pass
-
