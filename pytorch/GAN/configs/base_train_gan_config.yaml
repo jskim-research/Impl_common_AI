@@ -1,0 +1,10 @@
+training:
+  batch_size: 64
+  epochs: 100
+  learning_rate: 0.0002
+  latent_dim: 100
+  save_freq: 10
+
+paths:
+  save_folder: "checkpoints/gan"
+  plot_folder: "plots/gan"
