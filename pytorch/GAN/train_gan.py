@@ -120,17 +120,26 @@ if __name__ == "__main__":
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=batch_size,
                               shuffle=True,
-                              drop_last=True)
+                              drop_last=True,
+                              num_workers=4,  # 데이터 로딩을 위한 서브 프로세스 개수
+                              pin_memory=True,  # OS 가 데이터 페이지를 swap out (to disk) 하지 않도록 보장
+                              persistent_workers=True)  # worker가 종료되지 않고 계속해서 데이터를 로드할 수 있도록 함 (프로세스 생성과 초기화에 소요되는 시간 감소)
 
     valid_loader = DataLoader(dataset=valid_dataset,
                               batch_size=batch_size,
                               shuffle=False,
-                              drop_last=True)
+                              drop_last=True,
+                              num_workers=4,
+                              pin_memory=True,
+                              persistent_workers=True)
 
     test_loader = DataLoader(dataset=test_dataset,
                              batch_size=batch_size,
                              shuffle=False,
-                             drop_last=True)
+                             drop_last=True,
+                             num_workers=4,
+                             pin_memory=True,
+                             persistent_workers=True)
 
     def weights_init(m):
         classname = m.__class__.__name__
@@ -155,6 +164,7 @@ if __name__ == "__main__":
     for epoch in range(epochs):
         g.train()
         d.train()
+
         for x, y in train_loader:
             x = x.to(device)
             y = y.to(device)
