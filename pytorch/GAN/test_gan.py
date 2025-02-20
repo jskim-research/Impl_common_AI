@@ -24,43 +24,19 @@ from torch.utils.data import random_split, DataLoader
 from sklearn.model_selection import KFold
 
 
-def gaussian_kernel(x: torch.Tensor, mu: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+def calculate_lls(data: torch.Tensor, target: torch.Tensor, bandwidth: torch.Tensor) -> torch.Tensor:
     """
-    Gaussian kernel function
-
-    Args:
-        x: input tensor (1, 28, 28)
-        mu: gaussian mean tensor (N, 1, 28, 28)
-        sigma: standard deviation (1)
-
-    Returns:
-        Gaussian kernel tensor
-    """
-    D = x.size(0) * x.size(1) * x.size(2)
-    a = (x - mu) / sigma
-
-    t = -0.5 * (a ** 2).sum(dim=(1, 2, 3))
-    E = torch.exp(t)
-    Z = (1 / (torch.tensor(2 * torch.pi)).sqrt())  # normalization constant
-    return Z * E
-
-
-def calculate_mean_std_ll(data: torch.Tensor, target: torch.Tensor, bandwidth: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Calculate mean and standard deviation of log likelihood estimation
+    Calculate log likelihoods of target data
 
     Args:
         data: data tensor (N1, 1, 28, 28)
         target: evaluation target tensor (N2, 1, 28, 28)
         bandwidth: bandwidth tensor (1)
     Returns:
-        mean and standard deviation of log likelihood estimation
+        log likelihoods (N2)
     """
     data = data.view(1, data.size(0), -1)  # (1, N1, 784)
     target = target.view(target.size(0), 1, -1)  # (N2, 1, 784)
-
-    device = data.device
-    data_len = torch.tensor(data.size(0))
     dimension = data.size(2)
 
     split_size = 10
@@ -72,17 +48,17 @@ def calculate_mean_std_ll(data: torch.Tensor, target: torch.Tensor, bandwidth: t
         a = (split_target - data) / bandwidth  # (split_size, N1, 784)
         t = -0.5 * (a ** 2).sum(dim=2)  # (split_size, N1)
 
-        # log mean exp (pixel dimension 에 대해선 mean 값 취함)
         max_t = t.max(1, keepdims=True).values  # (split_size, 1)
+        # log sum exp trick
         E = max_t.squeeze() + torch.log(torch.mean(torch.exp(t - max_t), dim=1))  # (split_size)
         Z = dimension * torch.log((bandwidth * torch.tensor(2 * torch.pi)).sqrt())  # (split_size)
-        log_likelihoods += E - Z
+        log_likelihoods.extend(E - Z)
+
+    if len(log_likelihoods) != target.size(0):
+        raise ValueError("Log likelihoods size mismatch")
 
     log_likelihoods = torch.stack(log_likelihoods, dim=0)
-    mean_ll = torch.mean(log_likelihoods)
-    std_ll = torch.std(log_likelihoods)
-
-    return mean_ll, std_ll
+    return log_likelihoods
 
 
 if __name__ == "__main__":
@@ -138,7 +114,7 @@ if __name__ == "__main__":
                                   transform=transforms.ToTensor())
 
     # Evaluation
-    # parzen window log likelihood estimation 구현 필요
+    # parzen window log likelihood estimation
 
     # dataset -> tensor 변환
     all_train_data = torch.stack([dataset[i][0] for i in range(len(dataset))]).to(device)
@@ -150,25 +126,23 @@ if __name__ == "__main__":
     # Cross validation 기반 best bandwidth 탐색
     # bandwidth 후보군
     bandwidths = torch.logspace(-1, 0, 10).to(device)
-    k_folds = 5
-    kfold = KFold(n_splits=k_folds, shuffle=True)
+
+    limit_size = 1000
     best_mll = -float("inf")
     best_bandwidth = None
 
     with torch.no_grad():
+        z = torch.randn((limit_size, latent_dim)).to(device)
+        fake_images = g(z).view(-1, 1, 28, 28)
+
+        # Find best bandwidth
         for bandwidth in bandwidths:
-            mll = 0
+            valid_data = all_train_data[:limit_size]
 
-            for fold, (train_idx, valid_idx) in enumerate(kfold.split(all_train_data)):
-                train_fold = all_train_data[train_idx]
-                valid_fold = all_train_data[valid_idx]
+            lls = calculate_lls(valid_data, fake_images, bandwidth)
 
-                fold_mll, _ = calculate_mean_std_ll(train_fold, valid_fold, bandwidth)
-                mll += fold_mll
-                print(f"bandwidth: {bandwidth:.4f}, fold-{fold}-mll: {fold_mll:.4f}")
-
-            # mean of log likelihood estimates of all folds
-            mll /= k_folds
+            # mean of log likelihood estimates
+            mll = lls.mean()
 
             if mll > best_mll:
                 # best bandwidth 갱신
@@ -185,14 +159,12 @@ if __name__ == "__main__":
     std_lls = []
 
     with torch.no_grad():
+        all_lls = []
         for _ in range(eval_epochs):
             z = torch.randn((eval_batch_size, latent_dim)).to(device)
             fake_images = g(z).view(-1, 1, 28, 28)
-            mean_ll, std_ll = calculate_mean_std_ll(all_test_data, fake_images, best_bandwidth)
-            mean_lls.append(mean_ll)
-            std_lls.append(std_ll)
+            lls = calculate_lls(all_test_data, fake_images, best_bandwidth)
+            all_lls.extend(lls)
 
-    mean_lls = torch.stack(mean_lls)
-    std_lls = torch.stack(std_lls)
-
-    print(f"Mean ll: {torch.mean(mean_lls):.4f}, Std ll: {torch.mean(std_lls):.4f}")
+    all_lls = torch.stack(all_lls)
+    print(f"Mean ll: {all_lls.mean():.4f}, Std ll: {all_lls.std():.4f}")
