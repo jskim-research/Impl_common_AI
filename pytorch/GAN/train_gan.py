@@ -1,12 +1,78 @@
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import torchvision.utils
 import yaml
 import os
 import argparse
 from torch.optim import Adam
 from torchvision import transforms, datasets
 from models.gan import G, D
+from torch.utils.data import random_split
+
+
+def step_d(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss_func: nn.Module, latent_dim: int) -> torch.Tensor:
+    """
+    One step of training or validation for discriminator
+
+    Args:
+        generator: generator model
+        discriminator: discriminator model
+        x: input image tensor (B, 1, 28, 28)
+        y: label tensor (B, 1) which represents real or fake as 1 or 0
+        loss_func: loss function
+        latent_dim: latent dimension
+
+    Returns:
+         Loss tensor
+    """
+    device = x.device
+    batch_size = x.size(0)
+    # sample minibatch of noise samples from noise prior p_g(z)
+    z = torch.randn((batch_size, latent_dim)).to(device)
+    real_x = x.reshape(batch_size, -1).to(device)
+
+    real_labels = torch.ones(batch_size, 1).to(device)
+    fake_labels = torch.zeros(batch_size, 1).to(device)
+
+    # maximize V(D,G) = E_x~p_data(x)[log D(x)] + E_z~p_z(z)[log(1-D(G(z)))]
+    # 진짜는 진짜로, 가짜는 가짜로 구분하도록 discriminator loss 계산
+    real_loss = loss_func(discriminator(real_x), real_labels)
+    fake_images = generator(z)
+    fake_loss = loss_func(discriminator(fake_images), fake_labels)
+    loss_d = real_loss + fake_loss
+
+    return loss_d
+
+
+def step_g(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss_func: nn.Module, latent_dim: int) -> torch.Tensor:
+    """
+    One step of training or validation for generator
+
+    Args:
+        generator: generator model
+        discriminator: discriminator model
+        x: input image tensor (B, 1, 28, 28)
+        loss_func: loss function
+        latent_dim: latent dimension
+
+    Returns:
+        Loss tensor
+
+    """
+    batch_size = x.size(0)
+    device = x.device
+    # sample minibatch of noise samples from noise prior p_g(z)
+    z = torch.randn((batch_size, latent_dim)).to(device)
+    fake_images = generator(z)
+    real_labels = torch.ones((batch_size, 1)).to(device)
+
+    # maximize V(D,G) = E_z~p_z(z)[log D(G(z))]
+    # 가짜 이미지를 진짜로 구분하도록 generator 학습
+    # E_z~p_z(z)[log (1 - D(G(z)))] 가 아닌 E_z~p_z(z)[log D(G(z))] 를 사용함으로써 초반 학습 속도 향상
+    loss_g = loss_func(discriminator(fake_images), real_labels)
+
+    return loss_g
 
 
 if __name__ == "__main__":
@@ -35,10 +101,17 @@ if __name__ == "__main__":
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    train_dataset = datasets.MNIST(root="data",
-                                   train=True,
-                                   download=True,
-                                   transform=transforms.ToTensor())
+    dataset = datasets.MNIST(root="data",
+                             train=True,
+                             download=True,
+                             transform=transforms.ToTensor())
+
+    # train, valid data 80%, 20% 로 나누기
+    train_len = int(len(dataset) * 0.8)
+    valid_len = len(dataset) - train_len
+
+    train_dataset, valid_dataset = random_split(dataset, [train_len, valid_len])
+
 
     test_dataset = datasets.MNIST(root="data",
                                   train=False,
@@ -49,12 +122,15 @@ if __name__ == "__main__":
                                                shuffle=True,
                                                drop_last=True)
 
+    valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset,
+                                               batch_size=batch_size,
+                                               shuffle=False,
+                                               drop_last=True)
+
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                               batch_size=batch_size,
                                               shuffle=False,
                                               drop_last=True)
-
-    # pixel value range [0, 1]
 
     def weights_init(m):
         classname = m.__class__.__name__
@@ -73,50 +149,53 @@ if __name__ == "__main__":
     g.to(device)
     d.to(device)
 
-    # Optimizer 에 따른 영향도 당연히 크고
     optim_g = Adam(g.parameters(), lr=lr, betas=(0.5, 0.999))
     optim_d = Adam(d.parameters(), lr=lr, betas=(0.5, 0.999))
 
     for epoch in range(epochs):
+        g.train()
+        d.train()
         for x, y in train_loader:
             x.to(device)
             y.to(device)
 
-            # sample minibatch of noise samples from noise prior p_g(z)
-            z = torch.randn((batch_size, latent_dim)).to(device)
-            real_x = x.reshape(batch_size, -1).to(device)
-
-            real_labels = torch.ones(batch_size, 1).to(device)
-            fake_labels = torch.zeros(batch_size, 1).to(device)
-
-            # maximize V(D,G) = E_x~p_data(x)[log D(x)] + E_z~p_z(z)[log(1-D(G(z)))]
-            # 진짜는 진짜로, 가짜는 가짜로 구분하도록 discriminator 학습
-            real_loss = criterion(d(real_x), real_labels)
-            fake_images = g(z)
-            fake_loss = criterion(d(fake_images), fake_labels)
-            loss_d = real_loss + fake_loss
-
+            loss_d = step_d(g, d, x, criterion, latent_dim)
             optim_d.zero_grad()
             loss_d.backward()
             optim_d.step()
 
-            # maximize V(D,G) = E_z~p_z(z)[log D(G(z))]
-            # 가짜 이미지를 진짜로 구분하도록 generator 학습
-            fake_images = g(z)
-            loss_g = criterion(d(fake_images), real_labels)
+            loss_g = step_g(g, d, x, criterion, latent_dim)
             optim_g.zero_grad()
             loss_g.backward()
             optim_g.step()
 
         if (epoch + 1) % save_freq == 0:
+            # Model validation and save
+            g.eval()
+            d.eval()
+            valid_loss_g = 0
+            valid_loss_d = 0
+            valid_len = 0
+            with torch.no_grad():
+                for x, y in valid_loader:
+                    x.to(device)
+                    y.to(device)
+
+                    valid_loss_d += step_d(g, d, x, criterion, latent_dim).item()
+                    valid_loss_g += step_g(g, d, x, criterion, latent_dim).item()
+                    valid_len += x.size(0)
+
+                valid_loss_d /= valid_len
+                valid_loss_g /= valid_len
+                print(f"Epoch [{epoch + 1}/{epochs}], Validation Loss D: {valid_loss_d:.4f}, Validation Loss G: {valid_loss_g:.4f}")
+
+                # Generate image for visualization
+                z = torch.randn((4, latent_dim)).to(device)
+                fake_images = g(z)
+
             torch.save(g.state_dict(), os.path.join(save_folder, "generator.pth"))
             torch.save(d.state_dict(), os.path.join(save_folder, "discriminator.pth"))
-            plt.imshow(fake_images.view(fake_images.size(0), 1, 28, 28)[0].squeeze().cpu().detach().numpy(), cmap='gray')
-            plt.savefig(os.path.join(plot_folder, f'fake_image_epoch_{epoch + 1}.png'))
-            plt.close()
-
-        print(loss_d, loss_g)
-
+            torchvision.utils.save_image(fake_images.view(fake_images.size(0), 1, 28, 28), os.path.join(plot_folder, f'fake_image_epoch_{epoch + 1}.png'), nrow=4)
 
     # Evaluation
     # parzen window log likelihood estimation 구현 필요
