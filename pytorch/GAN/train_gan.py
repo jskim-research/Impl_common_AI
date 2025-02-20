@@ -8,7 +8,7 @@ import argparse
 from torch.optim import Adam
 from torchvision import transforms, datasets
 from models.gan import G, D
-from torch.utils.data import random_split
+from torch.utils.data import random_split, DataLoader
 
 
 def step_d(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss_func: nn.Module, latent_dim: int) -> torch.Tensor:
@@ -117,20 +117,20 @@ if __name__ == "__main__":
                                   train=False,
                                   transform=transforms.ToTensor())
 
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                               batch_size=batch_size,
-                                               shuffle=True,
-                                               drop_last=True)
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              drop_last=True)
 
-    valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset,
-                                               batch_size=batch_size,
-                                               shuffle=False,
-                                               drop_last=True)
+    valid_loader = DataLoader(dataset=valid_dataset,
+                              batch_size=batch_size,
+                              shuffle=False,
+                              drop_last=True)
 
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                              batch_size=batch_size,
-                                              shuffle=False,
-                                              drop_last=True)
+    test_loader = DataLoader(dataset=test_dataset,
+                             batch_size=batch_size,
+                             shuffle=False,
+                             drop_last=True)
 
     def weights_init(m):
         classname = m.__class__.__name__
@@ -156,8 +156,8 @@ if __name__ == "__main__":
         g.train()
         d.train()
         for x, y in train_loader:
-            x.to(device)
-            y.to(device)
+            x = x.to(device)
+            y = y.to(device)
 
             loss_d = step_d(g, d, x, criterion, latent_dim)
             optim_d.zero_grad()
@@ -178,8 +178,8 @@ if __name__ == "__main__":
             valid_len = 0
             with torch.no_grad():
                 for x, y in valid_loader:
-                    x.to(device)
-                    y.to(device)
+                    x = x.to(device)
+                    y = y.to(device)
 
                     valid_loss_d += step_d(g, d, x, criterion, latent_dim).item()
                     valid_loss_g += step_g(g, d, x, criterion, latent_dim).item()
@@ -196,6 +196,3 @@ if __name__ == "__main__":
             torch.save(g.state_dict(), os.path.join(save_folder, "generator.pth"))
             torch.save(d.state_dict(), os.path.join(save_folder, "discriminator.pth"))
             torchvision.utils.save_image(fake_images.view(fake_images.size(0), 1, 28, 28), os.path.join(plot_folder, f'fake_image_epoch_{epoch + 1}.png'), nrow=4)
-
-    # Evaluation
-    # parzen window log likelihood estimation 구현 필요
