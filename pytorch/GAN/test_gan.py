@@ -1,6 +1,8 @@
 """
 구현 사항
 1. Parzen window log likelihood estimation
+- 생성된 데이터가 실제 데이터 상에서 얼마나 likelihood 가 높은지 측정하는 방식
+- Cross validation 기반 kernel bandwidth 탐색 구현
 - 계산 안정성을 위해 log sum exp trick 사용 (log sum exp(x) = max + log sum exp(x - max))
 
 """
@@ -61,7 +63,7 @@ def calculate_mean_std_ll(data: torch.Tensor, target: torch.Tensor, bandwidth: t
     data_len = torch.tensor(data.size(0))
     dimension = data.size(2)
 
-    split_size = 20
+    split_size = 10
     log_likelihoods = []
 
     for split_start in range(0, target.size(0), split_size):
@@ -153,30 +155,44 @@ if __name__ == "__main__":
     best_mll = -float("inf")
     best_bandwidth = None
 
-    for bandwidth in bandwidths:
-        mll = 0
+    with torch.no_grad():
+        for bandwidth in bandwidths:
+            mll = 0
 
-        for fold, (train_idx, valid_idx) in enumerate(kfold.split(all_train_data)):
-            train_fold = all_train_data[train_idx]
-            valid_fold = all_train_data[valid_idx]
+            for fold, (train_idx, valid_idx) in enumerate(kfold.split(all_train_data)):
+                train_fold = all_train_data[train_idx]
+                valid_fold = all_train_data[valid_idx]
 
-            fold_mll, _ = calculate_mean_std_ll(train_fold, valid_fold, bandwidth)
-            mll += fold_mll
-            print(f"bandwidth: {bandwidth:.4f}, fold-{fold}-mll: {fold_mll:.4f}")
+                fold_mll, _ = calculate_mean_std_ll(train_fold, valid_fold, bandwidth)
+                mll += fold_mll
+                print(f"bandwidth: {bandwidth:.4f}, fold-{fold}-mll: {fold_mll:.4f}")
 
-        # mean of log likelihood estimates of all folds
-        mll /= k_folds
+            # mean of log likelihood estimates of all folds
+            mll /= k_folds
 
-        if mll > best_mll:
-            # best bandwidth 갱신
-            best_mll = mll
-            best_bandwidth = bandwidth
+            if mll > best_mll:
+                # best bandwidth 갱신
+                best_mll = mll
+                best_bandwidth = bandwidth
 
-        print(f"bandwidth: {bandwidth:.4f}, mll: {mll:.4f}")
+            print(f"bandwidth: {bandwidth:.4f}, mll: {mll:.4f}")
 
-    z = torch.randn((64, latent_dim)).to(device)
-    fake_images = g(z).view(-1, 1, 28, 28)
-    # fake_images = torch.randn((64, 1, 28, 28)).to(device)
-    mean_ll, std_ll = calculate_mean_std_ll(all_test_data, fake_images, best_bandwidth)
+    eval_batch_size = 64
+    eval_total_num = 10000  # test data 개수와 맞춤
+    eval_epochs = eval_total_num // eval_batch_size
 
-    print(f"Mean ll: {mean_ll:.4f}, Std ll: {std_ll:.4f}")
+    mean_lls = []
+    std_lls = []
+
+    with torch.no_grad():
+        for _ in range(eval_epochs):
+            z = torch.randn((eval_batch_size, latent_dim)).to(device)
+            fake_images = g(z).view(-1, 1, 28, 28)
+            mean_ll, std_ll = calculate_mean_std_ll(all_test_data, fake_images, best_bandwidth)
+            mean_lls.append(mean_ll)
+            std_lls.append(std_ll)
+
+    mean_lls = torch.stack(mean_lls)
+    std_lls = torch.stack(std_lls)
+
+    print(f"Mean ll: {torch.mean(mean_lls):.4f}, Std ll: {torch.mean(std_lls):.4f}")
