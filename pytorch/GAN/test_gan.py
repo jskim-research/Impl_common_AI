@@ -16,10 +16,10 @@ import yaml
 import os
 import argparse
 import torch.profiler
+import models
 from typing import Tuple
 from torch.optim import Adam
 from torchvision import transforms, datasets
-from models.gan import G, D
 from torch.utils.data import random_split, DataLoader
 from sklearn.model_selection import KFold
 
@@ -81,22 +81,30 @@ if __name__ == "__main__":
     save_freq = config["training"]["save_freq"]
     save_folder = config["paths"]["save_folder"]
     plot_folder = config["paths"]["plot_folder"]
+    model_name = config["model"]["name"]
 
     os.makedirs(save_folder, exist_ok=True)
     os.makedirs(plot_folder, exist_ok=True)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    g = G(latent_dim)
-    d = D()
+    if model_name == "gan":
+        g = models.gan.G(latent_dim)
+        d = models.gan.D()
+    elif model_name == "dcgan":
+        g = models.dcgan.G(latent_dim)
+        d = models.dcgan.D()
+    else:
+        raise ValueError(f"Model name ({model_name}) not found")
+
     g.to(device)
     d.to(device)
 
     generator_path = os.path.join(save_folder, "generator.pth")
     discriminator_path = os.path.join(save_folder, "discriminator.pth")
 
-    # g.load_state_dict(torch.load(generator_path, weights_only=True))
-    # d.load_state_dict(torch.load(discriminator_path, weights_only=True))
+    g.load_state_dict(torch.load(generator_path, weights_only=True))
+    d.load_state_dict(torch.load(discriminator_path, weights_only=True))
 
     dataset = datasets.MNIST(root="data",
                              train=True,

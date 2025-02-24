@@ -1,13 +1,13 @@
 model:
-  name: "gan"
+  name: "dcgan"
 
 training:
   batch_size: 128
-  epochs: 400
+  epochs: 100
   learning_rate: 0.0002
   latent_dim: 100
   save_freq: 10
 
 paths:
-  save_folder: "checkpoints/gan"
-  plot_folder: "plots/gan"
+  save_folder: "checkpoints/dcgan"
+  plot_folder: "plots/dcgan"

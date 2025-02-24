@@ -49,7 +49,7 @@ class D(nn.Module):
             nn.Linear(512, 256),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(256, 1),
-            nn.Sigmoid()
+            nn.Tanh()  # range (-1, 1)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -60,4 +60,5 @@ class D(nn.Module):
             probability of real image (batch_size, 1) with range [0, 1]
         """
         out = self.discriminator(x)
+        out = (out + 1) / 2
         return out

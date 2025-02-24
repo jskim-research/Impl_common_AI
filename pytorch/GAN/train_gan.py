@@ -5,9 +5,9 @@ import torchvision.utils
 import yaml
 import os
 import argparse
+import models
 from torch.optim import Adam
 from torchvision import transforms, datasets
-from models.gan import G, D
 from torch.utils.data import random_split, DataLoader
 
 
@@ -81,12 +81,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if os.path.exists(args.config):
-        with open("configs/base_train_gan_config.yaml") as f:
+        with open(args.config) as f:
             config = yaml.safe_load(f)
     else:
         raise FileNotFoundError("Config file not found")
-
-    print(config)
 
     batch_size = config["training"]["batch_size"]
     latent_dim = config["training"]["latent_dim"]
@@ -95,6 +93,7 @@ if __name__ == "__main__":
     save_freq = config["training"]["save_freq"]
     save_folder = config["paths"]["save_folder"]
     plot_folder = config["paths"]["plot_folder"]
+    model_name = config["model"]["name"]
 
     os.makedirs(save_folder, exist_ok=True)
     os.makedirs(plot_folder, exist_ok=True)
@@ -149,9 +148,16 @@ if __name__ == "__main__":
             nn.init.normal_(m.weight.data, 1.0, 0.02)
             nn.init.constant_(m.bias.data, 0)
 
-    g = G(latent_dim)
-    g.apply(weights_init)
-    d = D()
+    if model_name == "gan":
+        g = models.gan.G(latent_dim)
+        g.apply(weights_init)
+        d = models.gan.D()
+    elif model_name == "dcgan":
+        g = models.dcgan.G(latent_dim)
+        g.apply(weights_init)
+        d = models.dcgan.D()
+    else:
+        raise ValueError(f"Model name ({model_name}) not found")
 
     criterion = nn.BCELoss()  # p(y) = p^y * (1-p)^(1-y) 를 최대화하는 loss (negative log 걸겠지?)
 
