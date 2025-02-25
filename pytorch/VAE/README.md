@@ -2,7 +2,7 @@
 
 ### Environment
 
-$(pwd): GAN 폴더 경로로 대체할 것
+$(pwd): VAE 폴더 경로로 대체할 것
 ```bash
 $ docker build -t vae:v1.0 .
 $ docker run -itd --name vae_env -v $(pwd):/workspace --gpus all vae:v1.0
