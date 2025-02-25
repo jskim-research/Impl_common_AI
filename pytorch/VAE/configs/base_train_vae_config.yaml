@@ -1,0 +1,13 @@
+model:
+  name: "vae"
+
+training:
+  batch_size: 128
+  epochs: 1000
+  learning_rate: 0.001
+  latent_dim: 100
+  save_freq: 10
+
+paths:
+  save_folder: "checkpoints/vae"
+  plot_folder: "plots/vae"
