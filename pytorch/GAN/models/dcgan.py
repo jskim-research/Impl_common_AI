@@ -6,7 +6,7 @@ from torchvision import transforms, datasets
 
 
 class G(nn.Module):
-    def __init__(self, latent_dim=100):
+    def __init__(self, latent_dim: int = 100):
         super().__init__()
         self.generator = nn.Sequential(
             nn.ConvTranspose2d(latent_dim, 256, 7, 1, 0, bias=False),  # (512, 7, 7)
@@ -19,7 +19,7 @@ class G(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, z):
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
         """
         Args:
             z: latent vector (batch_size, latent_dim)
@@ -50,7 +50,7 @@ class D(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: input image (batch_size, 784)

@@ -24,7 +24,7 @@ def step_d(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss
         latent_dim: latent dimension
 
     Returns:
-         Loss tensor
+         Loss tensor (scalar)
     """
     device = x.device
     batch_size = x.size(0)
@@ -57,7 +57,7 @@ def step_g(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss
         latent_dim: latent dimension
 
     Returns:
-        Loss tensor
+        Loss tensor (scalar)
 
     """
     batch_size = x.size(0)
@@ -69,7 +69,7 @@ def step_g(generator: nn.Module, discriminator: nn.Module, x: torch.Tensor, loss
 
     # maximize V(D,G) = E_z~p_z(z)[log D(G(z))]
     # 가짜 이미지를 진짜로 구분하도록 generator 학습
-    # E_z~p_z(z)[log (1 - D(G(z)))] 가 아닌 E_z~p_z(z)[log D(G(z))] 를 사용함으로써 초반 학습 속도 향상
+    # minimize E_z~p_z(z)[log (1 - D(G(z)))] 가 아닌 maximize E_z~p_z(z)[log D(G(z))] 를 사용함으로써 초반 학습 속도 향상
     loss_g = loss_func(discriminator(fake_images), real_labels)
 
     return loss_g
