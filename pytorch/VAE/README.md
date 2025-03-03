@@ -1,5 +1,7 @@
 ## GAN 구현 및 실험
 
+Paper review: https://lowly-bearskin-8ac.notion.site/Auto-Encoding-Variational-Bayes-1ab1b30c9d178174ac38e90463037a62?pvs=4
+
 ### Environment
 
 $(pwd): VAE 폴더 경로로 대체할 것
